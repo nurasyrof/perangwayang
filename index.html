@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Perang Wayang</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@500;700;900&family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Noto+Sans+Javanese:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="vignette"></div>
+
+  <!-- ============ HUD ============ -->
+  <div id="hud" class="hidden">
+    <div class="hud-side p1">
+      <canvas class="portrait" id="portrait-p1" width="96" height="96"></canvas>
+      <div class="bars">
+        <div class="name-row">
+          <span class="name" id="name-p1">ARJUNA</span>
+          <span class="aksara" id="aksara-p1"></span>
+          <span class="rounds" id="rounds-p1"><i></i><i></i></span>
+        </div>
+        <div class="hp"><div class="trail" id="trail-p1"></div><div class="fill" id="hp-p1"></div></div>
+        <div class="ult"><div class="fill" id="ult-p1"></div><span class="ult-label" id="ultlbl-p1">AJI</span></div>
+      </div>
+    </div>
+    <div id="timer"><span id="timer-num">60</span></div>
+    <div class="hud-side p2">
+      <canvas class="portrait" id="portrait-p2" width="96" height="96"></canvas>
+      <div class="bars">
+        <div class="name-row">
+          <span class="name" id="name-p2">BIMA</span>
+          <span class="aksara" id="aksara-p2"></span>
+          <span class="rounds" id="rounds-p2"><i></i><i></i></span>
+        </div>
+        <div class="hp"><div class="trail" id="trail-p2"></div><div class="fill" id="hp-p2"></div></div>
+        <div class="ult"><div class="fill" id="ult-p2"></div><span class="ult-label" id="ultlbl-p2">AJI</span></div>
+      </div>
+    </div>
+    <div class="combo p1" id="combo-p1"></div>
+    <div class="combo p2" id="combo-p2"></div>
+    <div class="hint" id="fight-hint">Esc — jeda &nbsp;·&nbsp; M — musik</div>
+  </div>
+
+  <div id="announcer"></div>
+  <div id="ult-banner"><div class="ub-aksara"></div><div class="ub-name"></div><div class="ub-who"></div></div>
+  <div id="flash"></div>
+
+  <!-- ============ TITLE ============ -->
+  <section id="screen-title" class="screen">
+    <div class="title-wrap">
+      <div class="title-aksara">ꦥꦼꦫꦁ ꦮꦪꦁ</div>
+      <h1>PERANG<br/>WAYANG</h1>
+      <div class="subtitle">Tarung di Balik Kelir</div>
+      <nav class="menu" id="title-menu">
+        <button data-mode="cpu">1 Pemain <small>vs Bot</small></button>
+        <button data-mode="versus">2 Pemain <small>lokal</small></button>
+        <button data-mode="training">Latihan <small>boneka</small></button>
+        <button data-mode="controls">Kontrol &amp; Jurus</button>
+      </nav>
+      <div class="press">↑ ↓ / W S untuk memilih · Enter / J untuk mulai</div>
+    </div>
+  </section>
+
+  <!-- ============ SELECT ============ -->
+  <section id="screen-select" class="screen hidden">
+    <h2 class="sel-title" id="sel-title">PILIH KSATRIA</h2>
+    <div class="sel-sub" id="sel-sub">Pemain 1</div>
+    <div class="sel-grid" id="sel-grid"></div>
+    <div class="sel-info">
+      <div class="info-card" id="info-p1"></div>
+      <div class="sel-mid">
+        <div class="diff" id="diff-row">
+          <span>Tingkat Bot:</span>
+          <button data-diff="0">Mudah</button>
+          <button data-diff="1" class="on">Sedang</button>
+          <button data-diff="2">Sulit</button>
+        </div>
+        <div class="sel-help" id="sel-help">A / D pilih · J konfirmasi · K kembali</div>
+      </div>
+      <div class="info-card right" id="info-p2"></div>
+    </div>
+  </section>
+
+  <!-- ============ PAUSE ============ -->
+  <section id="screen-pause" class="screen hidden dim">
+    <div class="panel">
+      <h2>JEDA</h2>
+      <nav class="menu" id="pause-menu">
+        <button data-act="resume">Lanjutkan</button>
+        <button data-act="moves">Daftar Jurus</button>
+        <button data-act="restart">Ulangi Pertarungan</button>
+        <button data-act="select">Ganti Ksatria</button>
+        <button data-act="quit">Menu Utama</button>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ============ CONTROLS / MOVES ============ -->
+  <section id="screen-controls" class="screen hidden dim">
+    <div class="panel wide">
+      <h2>KONTROL &amp; JURUS</h2>
+      <div class="cols">
+        <div>
+          <h3>1 Pemain / Latihan</h3>
+          <table>
+            <tr><td>Gerak</td><td><kbd>A</kbd><kbd>D</kbd> atau <kbd>←</kbd><kbd>→</kbd></td></tr>
+            <tr><td>Lompat / Jongkok</td><td><kbd>W</kbd> / <kbd>S</kbd></td></tr>
+            <tr><td>Pukul</td><td><kbd>J</kbd></td></tr>
+            <tr><td>Tendang</td><td><kbd>K</kbd></td></tr>
+            <tr><td>Tangkis</td><td><kbd>L</kbd> atau tahan mundur</td></tr>
+            <tr><td>Guling</td><td><kbd>Spasi</kbd> (+arah)</td></tr>
+            <tr><td>Aji (ultimate)</td><td><kbd>U</kbd> / <kbd>I</kbd></td></tr>
+          </table>
+          <h3>2 Pemain</h3>
+          <table>
+            <tr><td>P1</td><td><kbd>WASD</kbd> · <kbd>F</kbd> pukul · <kbd>G</kbd> tendang · <kbd>H</kbd> tangkis · <kbd>Q</kbd> guling · <kbd>R</kbd> aji</td></tr>
+            <tr><td>P2</td><td><kbd>↑←↓→</kbd> · <kbd>,</kbd>/<kbd>Num1</kbd> pukul · <kbd>.</kbd>/<kbd>Num2</kbd> tendang · <kbd>/</kbd>/<kbd>Num3</kbd> tangkis · <kbd>Shift‑Kanan</kbd>/<kbd>Num0</kbd> guling · <kbd>'</kbd>/<kbd>Num5</kbd> aji</td></tr>
+            <tr><td>Gamepad</td><td>X pukul · A tendang · RB/LB tangkis · B guling · Y aji</td></tr>
+          </table>
+        </div>
+        <div>
+          <h3>Jurus Dasar</h3>
+          <table>
+            <tr><td>P, P, P</td><td>Rangkaian pukulan (akhir mementalkan)</td></tr>
+            <tr><td>P, K / P, P, K</td><td>Tendangan putar — menjatuhkan</td></tr>
+            <tr><td>Maju + P</td><td>Pukulan berat — menembus tangkisan</td></tr>
+            <tr><td>Bawah + P</td><td>Pukulan ke atas — anti-udara, melambungkan</td></tr>
+            <tr><td>Bawah + K</td><td>Sapuan rendah — tangkis sambil jongkok</td></tr>
+            <tr><td>Udara + P / K</td><td>Serangan atas — tangkis sambil berdiri</td></tr>
+            <tr><td>Tangkis tepat waktu</td><td><b>TANGKIS SEMPURNA</b> — lawan limbung</td></tr>
+            <tr><td>Guling saat jatuh</td><td>Bangun cepat</td></tr>
+            <tr><td>Aji saat pukulan kena</td><td>Batalkan jurus ke Aji</td></tr>
+          </table>
+          <p class="note">Serangan <i>tinggi</i> luput jika lawan jongkok. Serangan pembuka saat lawan menyerang = <b>KONTER</b> (+25%).</p>
+        </div>
+      </div>
+      <nav class="menu"><button data-act="back">Kembali</button></nav>
+    </div>
+  </section>
+
+  <!-- ============ RESULT ============ -->
+  <section id="screen-result" class="screen hidden dim">
+    <div class="panel">
+      <div class="res-aksara" id="res-aksara"></div>
+      <h2 id="res-title">MENANG</h2>
+      <div class="res-sub" id="res-sub"></div>
+      <nav class="menu" id="result-menu">
+        <button data-act="restart">Tarung Lagi</button>
+        <button data-act="select">Ganti Ksatria</button>
+        <button data-act="quit">Menu Utama</button>
+      </nav>
+    </div>
+  </section>
+
+  <div id="loading">Menyalakan blencong…</div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
