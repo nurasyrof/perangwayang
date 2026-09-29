@@ -191,6 +191,18 @@ html, body {
 
 #flash { position: fixed; inset: 0; pointer-events: none; background: #fff; opacity: 0; }
 
+/* ------------------------------------------------ CREDIT (always visible) */
+#credit {
+  position: fixed; right: 14px; bottom: 10px; z-index: 50; pointer-events: auto;
+  font: 500 13px 'Cormorant Garamond', serif; letter-spacing: .08em; color: var(--cream);
+  text-decoration: none; opacity: .7; padding: 3px 10px;
+  background: rgba(10,4,2,.55); border: 1px solid rgba(212,164,74,.35); border-radius: 3px;
+  transition: opacity .15s, border-color .15s;
+}
+#credit b { font-family: 'Cinzel', serif; font-weight: 700; color: var(--gold-hi); letter-spacing: .1em; }
+#credit span { opacity: .75; }
+#credit:hover { opacity: 1; border-color: var(--gold); }
+
 /* ------------------------------------------------ SCREENS */
 .screen {
   position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -294,12 +306,13 @@ kbd {
 .res-sub { font-size: 20px; font-style: italic; opacity: .85; }
 
 #loading {
-  position: fixed; inset: 0; display: grid; place-items: center; background: var(--deep);
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: var(--deep);
   font: 700 22px 'Cinzel', serif; letter-spacing: .2em; color: var(--gold); transition: opacity .6s;
 }
 #loading.done { opacity: 0; pointer-events: none; }
 
 @media (max-width: 900px) {
+  #credit span { display: none; }
   .hud-side { width: calc(50% - 56px); }
   .portrait { display: none; }
   #timer { width: 72px; height: 72px; }
