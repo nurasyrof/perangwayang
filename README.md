@@ -30,7 +30,9 @@ three.js and the fonts load from a CDN.
 | Roll (+ direction) | Space | Q | Right Shift or Num0 |
 | Aji (ultimate) | U / I | R | ' or Num5 |
 
-Gamepad: X punch · A kick · RB/LB block · B roll · Y/RT aji. Esc pauses. M toggles music.
+**Controller (Xbox / PlayStation / any standard gamepad):** stick or D-pad to move (up jumps, down crouches) · X/□ punch · A/✕ kick · B/○ roll · Y/△ or RT/R2 aji · LB/RB/LT (L1/R1/L2) block · Start/Options pauses. Menus: A select, B back. In 1P mode any connected controller drives P1. In 2P mode the first controller is P1 and the second is P2, and the keyboard keeps working alongside. Controllers rumble on hits, blocks, perfect blocks, ultimates and KOs.
+
+Esc pauses. M toggles music. **Tab** (or **Select/Back** on a controller) toggles the in-fight button guide. The guide shows keyboard or controller labels to match the device you last used, and remembers whether you turned it on or off.
 
 ## Fighting system
 - Strings: P,P,P · P,K / P,P,K (knockdown) · Fwd+P heavy that breaks guard · Down+P anti-air launcher · Down+K low sweep · air P/K overheads

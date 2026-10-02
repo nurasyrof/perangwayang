@@ -33,32 +33,76 @@ function emptyState() {
   return o;
 }
 
-function readPad(index) {
-  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-  const p = pads && pads[index];
-  if (!p) return null;
-  const b = (i) => !!(p.buttons[i] && p.buttons[i].pressed);
+// Connected pads in a stable order (browsers can leave holes in getGamepads()).
+export function connectedPads() {
+  const raw = navigator.getGamepads ? navigator.getGamepads() : [];
+  const out = [];
+  for (const p of raw) if (p && p.connected) out.push(p);
+  return out;
+}
+
+const DEAD = 0.45;
+function padState(p) {
+  const b = (i) => !!(p.buttons[i] && (p.buttons[i].pressed || p.buttons[i].value > 0.5));
   const ax = p.axes[0] || 0, ay = p.axes[1] || 0;
+  // Standard layout: 0 A/✕, 1 B/○, 2 X/□, 3 Y/△, 4 LB, 5 RB, 6 LT, 7 RT, 8 Back, 9 Start, 12-15 D-pad
   return {
-    left: b(14) || ax < -0.45, right: b(15) || ax > 0.45, up: b(12) || ay < -0.6, down: b(13) || ay > 0.6,
+    left: b(14) || ax < -DEAD, right: b(15) || ax > DEAD, up: b(12) || ay < -0.6, down: b(13) || ay > 0.6,
     punch: b(2), kick: b(0), roll: b(1), ult: b(3) || b(7), block: b(4) || b(5) || b(6),
+    start: b(9), select: b(8),
   };
 }
 
+// slot >= 0: that pad; slot === ANY_PAD: every connected pad merged
+export const ANY_PAD = -2;
+function readPad(slot) {
+  const pads = connectedPads();
+  if (slot === ANY_PAD) {
+    if (!pads.length) return null;
+    const m = {};
+    for (const p of pads) {
+      const st = padState(p);
+      for (const k in st) m[k] = m[k] || st[k];
+    }
+    return m;
+  }
+  const p = pads[slot];
+  return p ? padState(p) : null;
+}
+
+export function rumble(slot, strong = 0.5, weak = 0.5, ms = 80) {
+  const pads = connectedPads();
+  const list = slot === ANY_PAD ? pads : pads[slot] ? [pads[slot]] : [];
+  for (const p of list) {
+    const act = p.vibrationActuator;
+    if (act && act.playEffect) {
+      act.playEffect('dual-rumble', { duration: ms, strongMagnitude: strong, weakMagnitude: weak }).catch(() => {});
+    }
+  }
+}
+
 export class KeyController {
-  constructor(map, padIndex = -1) {
+  constructor(map, padIndex = -1, layout = 'solo') {
     this.map = map;
     this.padIndex = padIndex;
+    this.layout = layout;
+    this.device = padIndex !== -1 && readPad(padIndex) ? 'pad' : 'kb';
     this.held = emptyState();
     this.prev = emptyState();
     this.pressed = emptyState();
   }
   update() {
-    const pad = this.padIndex >= 0 ? readPad(this.padIndex) : null;
+    const pad = this.padIndex !== -1 ? readPad(this.padIndex) : null;
     for (const b of BUTTONS) {
       this.prev[b] = this.held[b];
-      let v = this.map[b].some((c) => down.has(c));
-      if (pad && pad[b]) v = true;
+      const k = this.map[b].some((c) => down.has(c));
+      const g = !!(pad && pad[b]);
+      // remember the last device used, so the on-screen guide shows matching labels
+      if (k && !this.prevKey?.[b]) this.device = 'kb';
+      if (g && !this.prevPad?.[b]) this.device = 'pad';
+      (this.prevKey ||= {})[b] = k;
+      (this.prevPad ||= {})[b] = g;
+      const v = k || g;
       this.held[b] = v;
       this.pressed[b] = v && !this.prev[b];
     }
@@ -68,6 +112,9 @@ export class KeyController {
       this.held[b] = false;
       this.pressed[b] = false;
     }
+  }
+  rumble(strong, weak, ms) {
+    if (this.padIndex !== -1) rumble(this.padIndex, strong, weak, ms);
   }
 }
 
@@ -87,14 +134,20 @@ export class MenuInput {
       p1left: down.has('KeyA'), p1right: down.has('KeyD'), p1ok: down.has('KeyJ') || down.has('KeyF'), p1back: down.has('KeyK') || down.has('KeyG'),
       p2left: down.has('ArrowLeft'), p2right: down.has('ArrowRight'), p2ok: down.has('Comma') || down.has('Numpad1') || down.has('Enter'), p2back: down.has('Period') || down.has('Numpad2'),
     };
-    for (let i = 0; i < 2; i++) {
-      const p = readPad(i);
-      if (!p) continue;
+    now.pause = false;
+    now.guide = false;
+    const pads = connectedPads();
+    pads.forEach((pad, i) => {
+      const p = padState(pad);
       now.up ||= p.up; now.down ||= p.down; now.left ||= p.left; now.right ||= p.right;
       now.ok ||= p.kick || p.punch; now.back ||= p.roll;
-      const pre = i === 0 ? 'p1' : 'p2';
-      now[pre + 'left'] ||= p.left; now[pre + 'right'] ||= p.right; now[pre + 'ok'] ||= p.kick || p.punch; now[pre + 'back'] ||= p.roll;
-    }
+      now.pause ||= p.start;
+      now.guide ||= p.select;
+      if (i < 2) {
+        const pre = i === 0 ? 'p1' : 'p2';
+        now[pre + 'left'] ||= p.left; now[pre + 'right'] ||= p.right; now[pre + 'ok'] ||= p.kick || p.punch; now[pre + 'back'] ||= p.roll;
+      }
+    });
     const pressed = {};
     for (const k in now) pressed[k] = now[k] && !this.prev[k];
     this.prev = now;

@@ -4,7 +4,7 @@ import { FX } from './fx.js';
 import { HUD } from './hud.js';
 import { Fighter, overlap, resolveHit, STAGE_HALF, MAX_SEP, ULT_MAX } from './fighter.js';
 import { CHARACTERS } from './characters.js';
-import { KeyController, KEYMAPS, MenuInput, initKeyboard, BUTTONS } from './input.js';
+import { KeyController, KEYMAPS, MenuInput, initKeyboard, BUTTONS, ANY_PAD, connectedPads } from './input.js';
 import { BotController } from './ai.js';
 import { CINE_FRAMES } from './ultimates.js';
 import { drawPortrait } from './textures.js';
@@ -88,6 +88,8 @@ class Game {
     window.addEventListener('keydown', unlock, { once: false });
     window.addEventListener('pointerdown', unlock, { once: false });
     window.addEventListener('keydown', (e) => this.onKey(e));
+    window.addEventListener('gamepadconnected', (e) => this.onPad(e, true));
+    window.addEventListener('gamepaddisconnected', (e) => this.onPad(e, false));
 
     this.last = performance.now();
     requestAnimationFrame((t) => this.loop(t));
@@ -365,10 +367,10 @@ class Game {
     b.puppet.root.visible = true;
     a.wins = b.wins = 0;
     if (this.mode === 'versus') {
-      a.ctrl = new KeyController(KEYMAPS.p1, 0);
-      b.ctrl = new KeyController(KEYMAPS.p2, 1);
+      a.ctrl = new KeyController(KEYMAPS.p1, 0, 'p1');
+      b.ctrl = new KeyController(KEYMAPS.p2, 1, 'p2');
     } else {
-      a.ctrl = new KeyController(KEYMAPS.solo, 0);
+      a.ctrl = new KeyController(KEYMAPS.solo, ANY_PAD, 'solo');
       b.ctrl = new BotController(this, this.diff, this.mode === 'training');
       b.ctrl.me = b;
     }
@@ -435,6 +437,7 @@ class Game {
     this.hud.ultBanner(f);
     this.hud.flash('#' + f.def.ult.color.toString(16).padStart(6, '0'), 0.35);
     this.audio.ultCharge();
+    this.rumble(f, 0.4, 0.8, 500);
     this.stage.setMood(f.def.ult.color, 14);
     this.stage.bloom.strength = 0.95;
   }
@@ -453,6 +456,8 @@ class Game {
     this.hitstop = Math.max(this.hitstop, h.isUlt && heavy ? 12 : heavy ? 8 : 5);
     this.stage.shake(heavy ? 0.28 : 0.1);
     def.puppet.flash(0xffffff, 6);
+    this.rumble(def, heavy ? 0.9 : 0.5, heavy ? 0.7 : 0.4, heavy ? 180 : 90);
+    this.rumble(att, 0.15, heavy ? 0.5 : 0.3, 60);
     this.hud.combo(att.idx, def.comboTaken, def.comboDmg, counter ? 'KONTER!' : null);
     if (h.isUlt && heavy) this.hud.flash('#fff', 0.35);
   }
@@ -462,6 +467,7 @@ class Game {
     this.fx.block(pos);
     this.hitstop = Math.max(this.hitstop, h.isUlt ? 6 : 4);
     def.puppet.flash(0x6fc8ff, 5);
+    this.rumble(def, 0.1, 0.35, 60);
     if (h.guardCrush) {
       this.stage.shake(0.12);
       this.hud.combo(att.idx, 0, 0, 'TEMBUS!');
@@ -474,6 +480,8 @@ class Game {
     this.fx.burst(pos.x, pos.y, pos.z, 0xffe39a, 24, 0.2);
     this.hitstop = 14;
     def.puppet.flash(0xffd76a, 10);
+    this.rumble(def, 0.3, 1, 140);
+    this.rumble(att, 0.6, 0.2, 200);
     this.hud.combo(def.idx, 0, 0, 'TANGKIS SEMPURNA!');
     this.hud.flash('#ffe7a0', 0.25);
   }
@@ -506,6 +514,8 @@ class Game {
     this.slow = 80;
     this.hitstop = 18;
     this.audio.ko();
+    this.rumble(def, 1, 1, 450);
+    this.rumble(att, 0.6, 0.6, 300);
     this.stage.shake(0.6);
     this.hud.flash('#fff', 0.8);
     const perfect = att.hp >= att.maxHp;
@@ -723,6 +733,10 @@ class Game {
       const on = this.audio.toggleMusic();
       if (this.phase === 'fight' || this.phase === 'intro') this.hud.combo(0, 0, 0, on ? 'MUSIK ON' : 'MUSIK OFF');
     }
+    if (e.code === 'Tab') {
+      e.preventDefault();
+      if (this.phase === 'fight' || this.phase === 'intro' || this.phase === 'ko') this.hud.toggleGuide();
+    }
     if (e.code === 'Escape' || e.code === 'KeyP') {
       if (this.overlay === 'controls') return this.closeControls();
       if (this.phase === 'fight' || this.phase === 'intro' || this.phase === 'ko') {
@@ -731,8 +745,26 @@ class Game {
     }
   }
 
+  onPad(e, connected) {
+    const n = connectedPads().length;
+    const name = (e.gamepad.id || 'Controller').replace(/\s*\(.*$/, '').slice(0, 40);
+    this.hud.toast(connected ? `🎮 ${name} terhubung` : `🎮 Controller terputus`, connected ? `${n} controller siap` : '');
+    document.body.classList.toggle('has-pad', n > 0);
+  }
+
+  rumble(f, strong, weak, ms) {
+    f?.ctrl?.rumble?.(strong, weak, ms);
+  }
+
   menuStep() {
     const m = this.menuInput.poll();
+    if (m.ok || m.pause) this.audio.init();
+    if (m.pause) {
+      if (this.overlay === 'controls') return this.closeControls();
+      if (this.phase === 'fight' || this.phase === 'intro' || this.phase === 'ko') return this.setPause(!this.paused);
+    }
+    if (this.overlay === 'pause' && m.back) return this.setPause(false);
+    if (m.guide && (this.phase === 'fight' || this.phase === 'intro' || this.phase === 'ko')) this.hud.toggleGuide();
     let nav = null;
     if (this.overlay === 'pause') nav = this.pauseMenu;
     else if (this.overlay === 'result') nav = this.resultMenu;

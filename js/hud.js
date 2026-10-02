@@ -3,6 +3,31 @@ import { ULT_MAX } from './fighter.js';
 
 const $ = (id) => document.getElementById(id);
 
+const LABELS = {
+  solo: { move: 'WASD / ←→', up: 'W', down: 'S', fwd: '→', punch: 'J', kick: 'K', block: 'L', roll: 'Spasi', ult: 'U' },
+  p1: { move: 'A D', up: 'W', down: 'S', fwd: 'maju', punch: 'F', kick: 'G', block: 'H', roll: 'Q', ult: 'R' },
+  p2: { move: '← →', up: '↑', down: '↓', fwd: 'maju', punch: ',', kick: '.', block: '/', roll: 'Shift‑Ka', ult: "'" },
+  pad: { move: 'Stik / D-pad', up: '↑', down: '↓', fwd: '→', punch: 'X □', kick: 'A ✕', block: 'RB R1', roll: 'B ○', ult: 'Y △' },
+};
+
+function guideHTML(layout, device, ultReady, def, who) {
+  const L = device === 'pad' ? LABELS.pad : LABELS[layout] || LABELS.solo;
+  const k = (t) => `<kbd>${t}</kbd>`;
+  const row = (keys, label, cls = '') => `<div class="g-row ${cls}"><span class="g-keys">${keys}</span><span>${label}</span></div>`;
+  return `<div class="g-head">${who ? who + ' · ' : ''}${device === 'pad' ? '🎮 Controller' : 'Keyboard'}</div>`
+    + row(k(L.punch), 'Pukul')
+    + row(k(L.kick), 'Tendang')
+    + row(k(L.block), 'Tangkis')
+    + row(k(L.roll), 'Guling')
+    + row(k(L.up), 'Lompat' + (def.doubleJump ? ' (2×)' : ''))
+    + row(k(L.ult), ultReady ? 'Aji — SIAP!' : 'Aji', ultReady ? 'g-ult' : 'g-dim')
+    + '<div class="g-sep"></div>'
+    + row(`${k(L.punch)}${k(L.punch)}${k(L.kick)}`, 'Kombo')
+    + row(`${k(L.fwd)}+${k(L.punch)}`, 'Berat')
+    + row(`${k(L.down)}+${k(L.punch)}`, 'Anti-udara')
+    + row(`${k(L.down)}+${k(L.kick)}`, 'Sapuan rendah');
+}
+
 export class HUD {
   constructor() {
     this.el = $('hud');
@@ -36,7 +61,36 @@ export class HUD {
     this.timer.style.visibility = infiniteTime ? 'hidden' : 'visible';
   }
 
+  // ---------------------------------------------------------------- in-fight button guide
+  toggleGuide(v) {
+    this.guideOn = v ?? !this.guideOn;
+    try { localStorage.setItem('pw-guide', this.guideOn ? '1' : '0'); } catch (e) { /* storage blocked */ }
+    this.guideKey = null;
+  }
+
+  renderGuide(fighters) {
+    if (this.guideOn === undefined) {
+      let saved = null;
+      try { saved = localStorage.getItem('pw-guide'); } catch (e) { /* storage blocked */ }
+      this.guideOn = saved !== '0';
+    }
+    const humans = fighters.map((f) => (f.ctrl && f.ctrl.layout ? f : null));
+    const key = this.guideOn + '|' + humans.map((f) => (f ? `${f.ctrl.layout}:${f.ctrl.device}:${f.meter >= ULT_MAX}:${f.def.id}` : '-')).join('|');
+    if (key === this.guideKey) return;
+    this.guideKey = key;
+    humans.forEach((f, i) => {
+      const el = document.getElementById(`guide-p${i + 1}`);
+      if (!f || !this.guideOn) {
+        el.classList.remove('show');
+        return;
+      }
+      el.innerHTML = guideHTML(f.ctrl.layout, f.ctrl.device, f.meter >= ULT_MAX, f.def, humans.filter(Boolean).length > 1 ? `P${i + 1}` : '');
+      el.classList.add('show');
+    });
+  }
+
   update(fighters, time) {
+    this.renderGuide(fighters);
     fighters.forEach((f, i) => {
       const s = this.side[i];
       const hp = Math.max(0, f.hp / f.maxHp) * 100;
@@ -100,6 +154,21 @@ export class HUD {
     b.classList.remove('show');
     void b.offsetWidth;
     b.classList.add('show');
+  }
+
+  toast(text, sub = '') {
+    let t = document.getElementById('toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'toast';
+      document.body.appendChild(t);
+    }
+    t.innerHTML = `<b>${text}</b>${sub ? `<span>${sub}</span>` : ''}`;
+    t.classList.remove('show');
+    void t.offsetWidth;
+    t.classList.add('show');
+    clearTimeout(this.toastT);
+    this.toastT = setTimeout(() => t.classList.remove('show'), 2600);
   }
 
   flash(color = '#fff', opacity = 0.7) {
